@@ -1,0 +1,775 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Deploys ELB and ASG",
+    "Parameters": {
+      "VPCIdentifier": {
+        "Type": "String",
+        "Description": "Specify the VPC Identifier - This is only to be used if more than one VPC is being deployed into the account"
+      },
+      "ImageId": {
+        "Type": "String",
+        "Description": "AMI ID to use within your launch config",
+        "Default": "ami-09b42976632b27e9b"
+      },
+      "ELBSubnet1": {
+        "Description": "ID of the Subnet the instance should be launched in, this will link the instance to the same VPC.",
+        "Type": "List<AWS::EC2::Subnet::Id>"
+      },
+      "ELBSubnet2": {
+        "Description": "ID of the Subnet the instance should be launched in, this will link the instance to the same VPC.",
+        "Type": "List<AWS::EC2::Subnet::Id>"
+      },
+      "ELBIpAddressType": {
+        "Type": "String",
+        "AllowedValues": [
+          "ipv4",
+          "dualstack"
+        ],
+        "Default": "ipv4"
+      },
+      "InstanceType": {
+        "Description": "EC2 instance type",
+        "Type": "String",
+        "Default": "t2.small",
+        "AllowedValues": [
+          "t1.micro",
+          "t2.nano",
+          "t2.micro",
+          "t2.small",
+          "t2.medium",
+          "t2.large",
+          "m1.small",
+          "m1.medium",
+          "m1.large",
+          "m1.xlarge",
+          "m2.xlarge",
+          "m2.2xlarge",
+          "m2.4xlarge",
+          "m3.medium",
+          "m3.large",
+          "m3.xlarge",
+          "m3.2xlarge",
+          "m4.large",
+          "m4.xlarge",
+          "m4.2xlarge",
+          "m4.4xlarge",
+          "m4.10xlarge",
+          "c1.medium",
+          "c1.xlarge",
+          "c3.large",
+          "c3.xlarge",
+          "c3.2xlarge",
+          "c3.4xlarge",
+          "c3.8xlarge",
+          "c4.large",
+          "c4.xlarge",
+          "c4.2xlarge",
+          "c4.4xlarge",
+          "c4.8xlarge",
+          "g2.2xlarge",
+          "g2.8xlarge",
+          "r3.large",
+          "r3.xlarge",
+          "r3.2xlarge",
+          "r3.4xlarge",
+          "r3.8xlarge",
+          "i2.xlarge",
+          "i2.2xlarge",
+          "i2.4xlarge",
+          "i2.8xlarge",
+          "d2.xlarge",
+          "d2.2xlarge",
+          "d2.4xlarge",
+          "d2.8xlarge",
+          "hi1.4xlarge",
+          "hs1.8xlarge",
+          "cr1.8xlarge",
+          "cc2.8xlarge",
+          "cg1.4xlarge"
+        ]
+      },
+      "InstanceSubnets": {
+        "Type": "List<AWS::EC2::Subnet::Id>",
+        "Description": "2 Private Subnets for the Instances within the ASG to be launched into"
+      },
+      "KeyName": {
+        "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+        "Type": "AWS::EC2::KeyPair::KeyName"
+      },
+      "SSHLocation": {
+        "Description": "The IP address range that can be used to SSH to the EC2 instances",
+        "Type": "String",
+        "MinLength": "9",
+        "MaxLength": "18",
+        "Default": "0.0.0.0/0",
+        "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+      },
+      "ListenerPort": {
+        "Description": "Listener Port for Service Behind ELB (ie 80 for Web Server)",
+        "Type": "String"
+      },
+      "AllowedListenerIp": {
+        "Description": "The IP address range that can be used to access the listener port",
+        "Type": "String",
+        "MinLength": "9",
+        "MaxLength": "18",
+        "Default": "0.0.0.0/0",
+        "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+      },
+      "MountPoint": {
+        "Description": "The Linux mount point for the EFS volume",
+        "Type": "String",
+        "MinLength": "1",
+        "Default": "sftpdata"
+      },
+      "CostCentreTag": {
+        "Description": "CostCentre Tag",
+        "Type": "String",
+        "Default": "management"
+      },
+      "CustomerUserdata": {
+        "Description": "Additional customer User data. Leave blank for none",
+        "Type": "String",
+        "Default": "https://s3-ap-southeast-2.amazonaws.com/<bucket-Name>/customer-userdata.sh"
+      },
+      "ASGMax": {
+        "Description": "Maximum Instances in ASG",
+        "Type": "String",
+        "Default": "2"
+      },
+      "ASGMin": {
+        "Description": "Minimum Instances in ASG",
+        "Type": "String",
+        "Default": "2"
+      },
+      "accessKeyId": {
+        "NoEcho": "true",
+        "Description": "accesskeyid for additional customer userdata scripts",
+        "Type": "String"
+      },
+      "secretKey": {
+        "NoEcho": "true",
+        "Description": "secretKey for additional customer userdata scripts",
+        "Type": "String"
+      },
+      "bucket": {
+        "Description": "bucket that contains userdata scripts",
+        "Type": "String"
+      }
+    },
+    "Resources": {
+      "AutoScalingGroup": {
+        "Type": "AWS::AutoScaling::AutoScalingGroup",
+        "Properties": {
+          "HealthCheckType": "ELB",
+          "HealthCheckGracePeriod": "135",
+          "VPCZoneIdentifier": {
+            "Ref": "InstanceSubnets"
+          },
+          "LaunchConfigurationName": {
+            "Ref": "LaunchConfig"
+          },
+          "MinSize": {
+            "Ref": "ASGMin"
+          },
+          "MaxSize": {
+            "Ref": "ASGMax"
+          },
+          "TargetGroupARNs": [
+            {
+              "Ref": "TargetGroup"
+            },
+            {
+              "Ref": "IntTargetGroup"
+            }
+          ],
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "AWS::StackName"
+              },
+              "PropagateAtLaunch": "true"
+            },
+            {
+              "Key": "CostCentre",
+              "Value": {
+                "Ref": "CostCentreTag"
+              },
+              "PropagateAtLaunch": "true"
+            }
+          ]
+        }
+      },
+      "LaunchConfig": {
+        "Type": "AWS::AutoScaling::LaunchConfiguration",
+        "Metadata": {
+          "AWS::CloudFormation::Init": {
+            "configSets": {
+              "MountConfig": [
+                "setup",
+                "mount",
+                "customeruserdata"
+              ]
+            },
+            "setup": {
+              "packages": {
+                "yum": {
+                  "nfs-utils": []
+                }
+              },
+              "files": {
+                "/etc/ssh/ssh_host_rsa_key": {
+                  "content": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "-----BEGIN RSA PRIVATE KEY-----\n",
+                        "MIIEpQIBAAKCAQEAz23NjHXAIGCTOC6nc9JNp8+WYgADrJcDTsqvYvCTpLdFlJsZ\n",
+                        "C/QHQ5WIyZ4xNRjkjhx/t4IV0PzuSyv6LzpI3uTgY14S3WTrEbB5KNaWOitl5xcT\n",
+                        "iwp6VLe0Pvvj7MhgIBJ5mQmRjCEfVrf7a7RNXuk3FM2ReeF3+0QJVxYLROYrIgz7\n",
+                        "yhkfzdbSTnDBMRQJ082byYvIC6+cp/8gVCoRp5ve0HmMc7PXx8EVjZseSrYf8WYQ\n",
+                        "vClgDPu4+sKJMG30WsNIyR31E4VF0WA2xOU0/Yi6BD8L3LglJqa8YAmOdVecwBMu\n",
+                        "5Oip1v/0kEJGEzI1LXc+DIErV7oAEY6wJoVvCQIDAQABAoIBAQCgWgrnhXOT0/Sb\n",
+                        "Hv3WPIJJsuFXOxmcB1XISEmTG9WXJRLGEawoIGqpJWUML51spaSx83gL/aUt3Qm9\n",
+                        "1O5gKheBL8ADMQs2WTibgSf4mQKjTz9EiQNTnjL5YNYXRpRpTHF6+a1E0C/S+xwF\n",
+                        "5s6W8VhKgdFR5KSMau9cr7jkuKbXiA8AJLk5/DV7ni6ZYl0vHc07DY2d4SWJTC1Z\n",
+                        "YlrKB4mLC1fdKLw5NtkJ1MzXhy0wwi+1Qcc6VlQll0rVh0nbzu6KqUezwCmAJUSg\n",
+                        "fScBcEZQm4hg4bmwa4StGf0tVfGiW76amiGGXQfNJ+cgELnhZf9Bid3tMR2nLsPB\n",
+                        "IWVi8bQNAoGBAOr6wTLMvUUXo/rqb/8doTtdaZI5mfGyDzzELuh/Hf8NgCzs8Q2n\n",
+                        "/zTTZR2yxT9Vot9Jc4SIehRKUt5d2l9fj8hQ3QvpQIgs6BoT9u2RGZnVaA4w30qI\n",
+                        "1oohesQOexZwpHfLuRk8SmbxtE3DjlfapHOrYPikFnnKUCBmMclePw53AoGBAOH8\n",
+                        "HVDdwp1iZXYRKhBA5nZ5sQQxndRBg9eShbDIq7Q9R7eQ2l9D6Td9L2RtSpoFBUN1\n",
+                        "TcmE+XyVNfEMk9eOwrPBDmb4iMvpKW2U6FYEz6efgrB2VSqQ0cJEzQCnhcXT85xV\n",
+                        "uXgqEryzyalqz9f072WOWZmXLARYIKqMOb7EE05/AoGBALyP8t+AGtZKDUX6QVuY\n",
+                        "/Fx2LpSv8pBY0g9yYy4hbAHTZKsojJvn100d4oO9hLm5T9UczT1qg4Sqy+szp1xn\n",
+                        "hCs8cNXxHN7qImti4AFuMfwXm8Pfhh/6xSbdjPWtpSqxw9l6OxQ8JHyNs6G/rwdj\n",
+                        "JhrISS3eB0c+iaQmPgeYwMMrAoGAdRcxhWXx4aRLF/raxaMrBnYVPywKMCFmE7tq\n",
+                        "o+fF99TMpRNb4oKIg2TMuodaYSV6zbIpBOJudpvFYEl5DPZ+ca71LGtYTfdYrNu7\n",
+                        "6l4BzkN67r3RcQWqebM2WUFzscYZcoaEW/vIy5eIRM0ANlBF/mPcjxViDDoxaszP\n",
+                        "WsWzjzcCgYEA4eUQ40bqXHgLHSYIls6eV4BpKaFjsuymD24vrHJeHYBWq/SEI89U\n",
+                        "91zFPL9yqUnqk3yv8wIt0kr0gkc/Bu5lo/VYIswqYNqlJmi3C41+EpyPZEbkjxoG\n",
+                        "H3OCsP5rtKNOuFA6/lNyswL/VEhNrjcGNiIjPoSd61qALYRkpnd8Xks=\n",
+                        "-----END RSA PRIVATE KEY-----\n"
+                      ]
+                    ]
+                  },
+                  "mode": "000600",
+                  "owner": "root",
+                  "group": "root"
+                },
+                "/etc/ssh/ssh_host_rsa_key.pub": {
+                  "content": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPbc2MdcAgYJM4Lqdz0k2nz5ZiAAOslwNOyq9i8JOkt0WUmxkL9AdDlYjJnjE1GOSOHH+3ghXQ/O5LK/ovOkje5OBjXhLdZOsRsHko1pY6K2XnFxOLCnpUt7Q+++PsyGAgEnmZCZGMIR9Wt/trtE1e6TcUzZF54Xf7RAlXFgtE5isiDPvKGR/N1tJOcMExFAnTzZvJi8gLr5yn/yBUKhGnm97QeYxzs9fHwRWNmx5Kth/xZhC8KWAM+7j6wokwbfRaw0jJHfUThUXRYDbE5TT9iLoEPwvcuCUmprxgCY51V5zAEy7k6KnW//SQQkYTMjUtdz4MgStXugARjrAmhW8J\n"
+                      ]
+                    ]
+                  },
+                  "mode": "000644",
+                  "owner": "root",
+                  "group": "root"
+                }
+              }
+            },
+            "mount": {
+              "commands": {
+                "01_createdir": {
+                  "command": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "mkdir /",
+                        {
+                          "Ref": "MountPoint"
+                        }
+                      ]
+                    ]
+                  }
+                },
+                "02_mount": {
+                  "command": {
+                    "Fn::Sub": "sleep 15 && sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 ${FileSystem}.efs.${AWS::Region}.amazonaws.com:/ /${MountPoint}"
+                  }
+                },
+                "02_permissions": {
+                  "command": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "chown ec2-user:ec2-user /",
+                        {
+                          "Ref": "MountPoint"
+                        }
+                      ]
+                    ]
+                  }
+                }
+              }
+            },
+            "customeruserdata": {
+              "files": {
+                "/home/ec2-user/customer-userdata.sh": {
+                  "source": {
+                    "Ref": "CustomerUserdata"
+                  },
+                  "mode": "000770",
+                  "owner": "ec2-user",
+                  "group": "ec2-user",
+                  "authentication": "S3AccessCreds"
+                }
+              },
+              "commands": {
+                "01_customeruserdataexecute": {
+                  "command": {
+                    "Fn::Sub": "sudo /home/ec2-user/customer-userdata.sh"
+                  }
+                }
+              }
+            }
+          },
+          "AWS::CloudFormation::Authentication": {
+            "S3AccessCreds": {
+              "type": "S3",
+              "accessKeyId": {
+                "Ref": "accessKeyId"
+              },
+              "secretKey": {
+                "Ref": "secretKey"
+              },
+              "buckets": [
+                {
+                  "Ref": "bucket"
+                }
+              ]
+            }
+          }
+        },
+        "Properties": {
+          "KeyName": {
+            "Ref": "KeyName"
+          },
+          "ImageId": {
+            "Ref": "ImageId"
+          },
+          "InstanceType": {
+            "Ref": "InstanceType"
+          },
+          "SecurityGroups": [
+            {
+              "Ref": "InstanceSecurityGroup"
+            },
+            {
+              "Fn::ImportValue": "ManagementSecurityGroup"
+            }
+          ],
+          "UserData": {
+            "Fn::Base64": {
+              "Fn::Join": [
+                "",
+                [
+                  "#!/bin/bash -xe\n",
+                  "yum install -y aws-cfn-bootstrap\n",
+                  "/opt/aws/bin/cfn-init -v ",
+                  "         --stack ",
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "         --resource LaunchConfig ",
+                  "         --configsets MountConfig ",
+                  "         --region ",
+                  {
+                    "Ref": "AWS::Region"
+                  },
+                  "\n",
+                  "crontab /home/ec2-user/crontab\n",
+                  "/opt/aws/bin/cfn-signal -e $? ",
+                  "         --stack ",
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "         --resource AutoScalingGroup ",
+                  "         --region ",
+                  {
+                    "Ref": "AWS::Region"
+                  },
+                  "\n"
+                ]
+              ]
+            }
+          }
+        }
+      },
+      "EIP1": {
+        "Type": "AWS::EC2::EIP",
+        "Properties": {
+          "Domain": "VPC"
+        }
+      },
+      "EIP2": {
+        "Type": "AWS::EC2::EIP",
+        "Properties": {
+          "Domain": "VPC"
+        }
+      },
+      "loadBalancer": {
+        "DependsOn": [
+          "EIP2",
+          "EIP1"
+        ],
+        "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        "Properties": {
+          "Scheme": "internet-facing",
+          "LoadBalancerAttributes": [
+            {
+              "Key": "load_balancing.cross_zone.enabled",
+              "Value": "true"
+            }
+          ],
+          "SubnetMappings": [
+            {
+              "AllocationId": {
+                "Fn::GetAtt": [
+                  "EIP1",
+                  "AllocationId"
+                ]
+              },
+              "SubnetId": {
+                "Fn::Select": [
+                  "0",
+                  {
+                    "Ref": "ELBSubnet1"
+                  }
+                ]
+              }
+            },
+            {
+              "AllocationId": {
+                "Fn::GetAtt": [
+                  "EIP2",
+                  "AllocationId"
+                ]
+              },
+              "SubnetId": {
+                "Fn::Select": [
+                  "0",
+                  {
+                    "Ref": "ELBSubnet2"
+                  }
+                ]
+              }
+            }
+          ],
+          "Type": "network",
+          "IpAddressType": {
+            "Ref": "ELBIpAddressType"
+          }
+        }
+      },
+      "intloadBalancer": {
+        "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        "Properties": {
+          "Scheme": "internal",
+          "LoadBalancerAttributes": [
+            {
+              "Key": "load_balancing.cross_zone.enabled",
+              "Value": "true"
+            }
+          ],
+          "Subnets": [
+            {
+              "Fn::Select": [
+                "0",
+                {
+                  "Ref": "InstanceSubnets"
+                }
+              ]
+            },
+            {
+              "Fn::Select": [
+                "1",
+                {
+                  "Ref": "InstanceSubnets"
+                }
+              ]
+            }
+          ],
+          "Type": "network",
+          "IpAddressType": {
+            "Ref": "ELBIpAddressType"
+          }
+        }
+      },
+      "TargetGroup": {
+        "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+        "Properties": {
+          "HealthyThresholdCount": "2",
+          "UnhealthyThresholdCount": "2",
+          "Name": "MyTargets",
+          "Port": {
+            "Ref": "ListenerPort"
+          },
+          "Protocol": "TCP",
+          "TargetGroupAttributes": [
+            {
+              "Key": "deregistration_delay.timeout_seconds",
+              "Value": "5"
+            }
+          ],
+          "VpcId": {
+            "Fn::ImportValue": {
+              "Fn::Sub": "VPC${VPCIdentifier}"
+            }
+          }
+        }
+      },
+      "IntTargetGroup": {
+        "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+        "Properties": {
+          "HealthyThresholdCount": "2",
+          "UnhealthyThresholdCount": "2",
+          "Name": "MyIntTargets",
+          "Port": {
+            "Ref": "ListenerPort"
+          },
+          "Protocol": "TCP",
+          "TargetGroupAttributes": [
+            {
+              "Key": "deregistration_delay.timeout_seconds",
+              "Value": "5"
+            }
+          ],
+          "VpcId": {
+            "Fn::ImportValue": {
+              "Fn::Sub": "VPC${VPCIdentifier}"
+            }
+          }
+        }
+      },
+      "Listener": {
+        "Type": "AWS::ElasticLoadBalancingV2::Listener",
+        "Properties": {
+          "DefaultActions": [
+            {
+              "Type": "forward",
+              "TargetGroupArn": {
+                "Ref": "TargetGroup"
+              }
+            }
+          ],
+          "LoadBalancerArn": {
+            "Ref": "loadBalancer"
+          },
+          "Port": {
+            "Ref": "ListenerPort"
+          },
+          "Protocol": "TCP"
+        }
+      },
+      "IntListener": {
+        "Type": "AWS::ElasticLoadBalancingV2::Listener",
+        "Properties": {
+          "DefaultActions": [
+            {
+              "Type": "forward",
+              "TargetGroupArn": {
+                "Ref": "IntTargetGroup"
+              }
+            }
+          ],
+          "LoadBalancerArn": {
+            "Ref": "intloadBalancer"
+          },
+          "Port": {
+            "Ref": "ListenerPort"
+          },
+          "Protocol": "TCP"
+        }
+      },
+      "InstanceSecurityGroup": {
+        "Type": "AWS::EC2::SecurityGroup",
+        "Properties": {
+          "GroupDescription": "Instance SG for ASG",
+          "SecurityGroupIngress": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "22",
+              "ToPort": "22",
+              "CidrIp": {
+                "Ref": "SSHLocation"
+              }
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": {
+                "Ref": "ListenerPort"
+              },
+              "ToPort": {
+                "Ref": "ListenerPort"
+              },
+              "CidrIp": {
+                "Ref": "AllowedListenerIp"
+              }
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": {
+                "Ref": "ListenerPort"
+              },
+              "ToPort": {
+                "Ref": "ListenerPort"
+              },
+              "CidrIp": {
+                "Fn::ImportValue": {
+                  "Fn::Sub": "VPCCidrBlock${VPCIdentifier}"
+                }
+              }
+            }
+          ],
+          "SecurityGroupEgress": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "80",
+              "ToPort": "80",
+              "CidrIp": "0.0.0.0/0"
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "443",
+              "ToPort": "443",
+              "CidrIp": "0.0.0.0/0"
+            }
+          ],
+          "VpcId": {
+            "Fn::ImportValue": {
+              "Fn::Sub": "VPC${VPCIdentifier}"
+            }
+          }
+        }
+      },
+      "NFSOutbound": {
+        "Type": "AWS::EC2::SecurityGroupEgress",
+        "Properties": {
+          "Description": "NFS Outbound",
+          "DestinationSecurityGroupId": {
+            "Ref": "MountTargetSecurityGroup"
+          },
+          "IpProtocol": "tcp",
+          "FromPort": "2049",
+          "ToPort": "2049",
+          "GroupId": {
+            "Ref": "InstanceSecurityGroup"
+          }
+        }
+      },
+      "FileSystem": {
+        "Type": "AWS::EFS::FileSystem",
+        "Properties": {
+          "PerformanceMode": "generalPurpose",
+          "FileSystemTags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "EfsFilesystem-",
+                    {
+                      "Ref": "AWS::StackName"
+                    }
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "MountTarget1": {
+        "Type": "AWS::EFS::MountTarget",
+        "Properties": {
+          "FileSystemId": {
+            "Ref": "FileSystem"
+          },
+          "SubnetId": {
+            "Fn::Select": [
+              "0",
+              {
+                "Ref": "InstanceSubnets"
+              }
+            ]
+          },
+          "SecurityGroups": [
+            {
+              "Ref": "MountTargetSecurityGroup"
+            }
+          ]
+        }
+      },
+      "MountTarget2": {
+        "Type": "AWS::EFS::MountTarget",
+        "Properties": {
+          "FileSystemId": {
+            "Ref": "FileSystem"
+          },
+          "SubnetId": {
+            "Fn::Select": [
+              "1",
+              {
+                "Ref": "InstanceSubnets"
+              }
+            ]
+          },
+          "SecurityGroups": [
+            {
+              "Ref": "MountTargetSecurityGroup"
+            }
+          ]
+        }
+      },
+      "MountTargetSecurityGroup": {
+        "Type": "AWS::EC2::SecurityGroup",
+        "Properties": {
+          "VpcId": {
+            "Fn::ImportValue": {
+              "Fn::Sub": "VPC${VPCIdentifier}"
+            }
+          },
+          "GroupDescription": "Security group for mount target",
+          "SecurityGroupIngress": [
+            {
+              "CidrIp": "127.0.0.1/32",
+              "IpProtocol": "-1"
+            }
+          ]
+        }
+      },
+      "NFSInbound": {
+        "Type": "AWS::EC2::SecurityGroupIngress",
+        "Properties": {
+          "Description": "NFS Inbound from Clients",
+          "SourceSecurityGroupId": {
+            "Ref": "InstanceSecurityGroup"
+          },
+          "IpProtocol": "tcp",
+          "FromPort": "2049",
+          "ToPort": "2049",
+          "GroupId": {
+            "Ref": "MountTargetSecurityGroup"
+          }
+        }
+      }
+    },
+    "Outputs": {
+      "URL": {
+        "Description": "URL of the ELB",
+        "Value": {
+          "Fn::GetAtt": [
+            "loadBalancer",
+            "DNSName"
+          ]
+        }
+      }
+    }
+  }
+  
