@@ -1,5 +1,6 @@
 # HA-SFTP
 Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
+
 **The solution can also be used for other solutions that are anle to utilise a shared EFS file system.**
 
 # Paramaters
