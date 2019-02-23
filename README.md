@@ -36,9 +36,9 @@ Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
 * **ASGMin** - Minimum Instances in ASG
 
 * **accessKeyId** - accesskeyid for additional customer userdata scripts. 
-  * **This is only to be used if "AWS::CloudFormation::Authentication" was needed. In my situation it was (wont go into detail). It is greatly advised to use an IAM instance profile role for access to the script instead.**
+  * **This is only to be used if "AWS::CloudFormation::Authentication" was needed. In my situation it was (won't go into detail). It is greatly advised to use an IAM instance profile role for access to the script instead.**
  
 * **secretKey** - secretKey for additional customer userdata scripts. 
-  * **This is only to be used if "AWS::CloudFormation::Authentication" was needed. In my situation it was (wont go into detail). It is greatly advised to use an IAM instance profile role for access to the script instead.**
+  * **This is only to be used if "AWS::CloudFormation::Authentication" was needed. In my situation it was (won't go into detail). It is greatly advised to use an IAM instance profile role for access to the script instead.**
 
 * **bucket** - bucket that contains userdata scripts.
