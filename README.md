@@ -27,7 +27,7 @@ Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
 * CostCentreTag - Used for cost tracking (automatically applied to instances)
 
 * CustomerUserdata - Additional customer User data. Leave blank for none. If it is to be ised, you must supply the sxript address from an S3 bucket.
-  "https://s3-ap-southeast-2.amazonaws.com/<bucket-Name>/customer-userdata.sh"
+  * "https://s3-ap-southeast-2.amazonaws.com/<bucket-Name>/customer-userdata.sh"
       
 
 
