@@ -2,7 +2,7 @@
 Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
 
 # Paramaters
-      <p> ImageId - This is the Amazon AMI ID to use within your launch config for your instances :</p>
+      <p>ImageId - This is the Amazon AMI ID to use within your launch config for your instances:</p>
 
       ** ImageId - This is the Amazon AMI ID to use within your launch config for your instances
 
