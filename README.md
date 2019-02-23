@@ -1,7 +1,7 @@
 # HA-SFTP
 Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
 
-**The code can also be used for other solutions that are able to utilise a shared EFS file system.**
+**The code can also be used for other solutions that are able to utilise a shared EFS file system across 2 nodes.**
 
 # Paramaters
 * **ImageId** - This is the Amazon AMI ID to use within your launch config for your instances
