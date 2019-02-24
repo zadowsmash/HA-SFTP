@@ -1,4 +1,4 @@
-# HA-SFTP
+# ha-sftp
 Deploy a HA SFTP Solution via AWS CloudFormation utilising EFS as Shared Storage
 
 **The code can also be used for other solutions that are able to utilise a shared EFS file system across 2 nodes.**
