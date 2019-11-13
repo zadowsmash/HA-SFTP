@@ -366,9 +366,6 @@
         "SecurityGroups": [
           {
             "Ref": "InstanceSecurityGroup"
-          },
-          {
-            "Fn::ImportValue": "ManagementSecurityGroup"
           }
         ],
         "UserData": {
@@ -624,9 +621,7 @@
               "Ref": "ListenerPort"
             },
             "CidrIp": {
-              "Fn::ImportValue": {
-                "Ref": "VPCCidrIp"
-              }
+              "Ref": "VPCCidrIp"
             }
           }
         ],
